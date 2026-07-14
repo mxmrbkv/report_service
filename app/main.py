@@ -73,17 +73,17 @@ def create_app() -> FastAPI:
     static_dir.mkdir(parents=True, exist_ok=True)
 
     # --- Раздача Allure-отчётов ---
-    # URL:  /reports/{project}/{id}/index.html
-    # Диск: data/reports/{project}/{id}/html/index.html
+    # URL:  /reports/{project}/index.html
+    # Диск: data/reports/{project}/html/index.html
     reports_base = settings.reports_path
 
-    @app.get("/reports/{project}/{report_id}/{file_path:path}", include_in_schema=False)
-    async def serve_report(project: str, report_id: str, file_path: str):
+    @app.get("/reports/{project}/{file_path:path}", include_in_schema=False)
+    async def serve_report(project: str, file_path: str):
         # Предотвращаем path traversal
-        if ".." in file_path or ".." in project or ".." in report_id:
+        if ".." in file_path or ".." in project:
             raise HTTPException(status_code=400, detail="Недопустимый путь")
 
-        full_path = reports_base / project / report_id / "html" / file_path
+        full_path = reports_base / project / "html" / file_path
         if not full_path.is_file():
             raise HTTPException(status_code=404, detail="Файл отчёта не найден")
 

@@ -183,6 +183,15 @@
             background: #e2e8f0;
             color: var(--text);
         }
+        .badge-uploads {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #c6f6d5;
+            color: #22543d;
+        }
         .pagination {
             display: flex;
             justify-content: center;
@@ -223,13 +232,9 @@
                     <label for="projectName">Проект</label>
                     <input type="text" id="projectName" value="default" placeholder="default">
                 </div>
-                <div class="form-field">
-                    <label for="buildId">Build ID (опционально)</label>
-                    <input type="text" id="buildId" placeholder="Автогенерация UUID">
-                </div>
             </div>
             <div class="upload-actions">
-                <button class="btn btn-primary" id="uploadBtn" disabled>Сгенерировать отчёт</button>
+                <button class="btn btn-primary" id="uploadBtn" disabled>Добавить результаты</button>
             </div>
             <div class="progress-bar" id="progressBar"><div class="fill"></div></div>
             <div class="progress-text" id="progressText" style="display:none;">Генерация отчёта...</div>
@@ -238,19 +243,21 @@
 
         <!-- Reports list -->
         <div class="reports-card">
-            <h2>Отчёты</h2>
+            <h2>Проекты</h2>
             <table>
                 <thead>
                     <tr>
                         <th>Проект</th>
-                        <th>ID</th>
-                        <th>Дата</th>
+                        <th>Загрузок</th>
+                        <th>Результатов</th>
+                        <th>Создан</th>
+                        <th>Обновлён</th>
                         <th>Размер</th>
                         <th>Действия</th>
                     </tr>
                 </thead>
                 <tbody id="reportsBody">
-                    <tr><td colspan="5" class="empty-state">Загрузка...</td></tr>
+                    <tr><td colspan="7" class="empty-state">Загрузка...</td></tr>
                 </tbody>
             </table>
             <div class="pagination" id="pagination" style="display:none;">
@@ -316,8 +323,6 @@
             const formData = new FormData();
             formData.append('file', selectedFile);
             formData.append('project_name', document.getElementById('projectName').value || 'default');
-            const buildId = document.getElementById('buildId').value.trim();
-            if (buildId) formData.append('build_id', buildId);
 
             try {
                 const resp = await fetch(API, { method: 'POST', body: formData });
@@ -325,7 +330,13 @@
                 if (!resp.ok) {
                     throw new Error(data.detail || 'Ошибка загрузки');
                 }
-                showAlert(`✅ Отчёт создан: <a href="${data.url}" target="_blank">${data.url}</a>`, 'success');
+                const verb = data.uploads_count > 1 ? 'обновлён' : 'создан';
+                showAlert(
+                    `✅ Проект «${escapeHtml(data.project)}» ${verb} ` +
+                    `(загрузок: ${data.uploads_count}, результатов: ${data.results_count}). ` +
+                    `<a href="${data.url}" target="_blank">Открыть отчёт →</a>`,
+                    'success'
+                );
                 selectedFile = null;
                 fileName.textContent = '';
                 uploadBtn.disabled = true;
@@ -349,7 +360,7 @@
                 totalPages = Math.ceil(data.total / data.page_size) || 1;
 
                 if (data.items.length === 0) {
-                    reportsBody.innerHTML = '<tr><td colspan="5" class="empty-state">Нет загруженных отчётов</td></tr>';
+                    reportsBody.innerHTML = '<tr><td colspan="7" class="empty-state">Нет загруженных проектов</td></tr>';
                     pagination.style.display = 'none';
                     return;
                 }
@@ -357,12 +368,14 @@
                 reportsBody.innerHTML = data.items.map(r => `
                     <tr>
                         <td><span class="badge">${escapeHtml(r.project)}</span></td>
-                        <td><code>${escapeHtml(r.id.substring(0, 8))}...</code></td>
+                        <td><span class="badge-uploads">${r.uploads_count}</span></td>
+                        <td>${r.results_count}</td>
                         <td>${formatDate(r.created_at)}</td>
+                        <td>${formatDate(r.updated_at)}</td>
                         <td>${formatSize(r.size_bytes)}</td>
                         <td>
                             <a href="${r.url}" target="_blank" class="btn btn-open">Открыть</a>
-                            <button class="btn btn-danger" onclick="deleteReport('${escapeHtml(r.project)}','${escapeHtml(r.id)}')">Удалить</button>
+                            <button class="btn btn-danger" onclick="deleteReport('${escapeHtml(r.project)}')">Удалить</button>
                         </td>
                     </tr>
                 `).join('');
@@ -372,14 +385,14 @@
                 nextBtn.disabled = page >= totalPages;
                 pageInfo.textContent = `Страница ${page} из ${totalPages} (всего ${data.total})`;
             } catch (err) {
-                reportsBody.innerHTML = `<tr><td colspan="5" class="empty-state">Ошибка: ${escapeHtml(err.message)}</td></tr>`;
+                reportsBody.innerHTML = `<tr><td colspan="7" class="empty-state">Ошибка: ${escapeHtml(err.message)}</td></tr>`;
             }
         }
 
-        async function deleteReport(project, id) {
-            if (!confirm(`Удалить отчёт ${id.substring(0, 8)}...?`)) return;
+        async function deleteReport(project) {
+            if (!confirm(`Удалить проект «${project}» со всеми результатами?`)) return;
             try {
-                const resp = await fetch(`${API}/${encodeURIComponent(project)}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+                const resp = await fetch(`${API}/${encodeURIComponent(project)}`, { method: 'DELETE' });
                 if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Ошибка'); }
                 loadReports(currentPage);
             } catch (err) {

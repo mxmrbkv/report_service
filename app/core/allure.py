@@ -9,7 +9,6 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
 
 import structlog
 
@@ -17,7 +16,6 @@ from app.core.config import Settings
 
 logger = structlog.get_logger(__name__)
 
-# Имя папки с сырыми результатами внутри ZIP
 ALLURE_RESULTS_DIR_NAME = "allure-results"
 
 
@@ -38,7 +36,11 @@ class AllureTimeoutError(AllureError):
 
 
 class ReportManager:
-    """Управляет жизненным циклом отчётов: приём, генерация, удаление, листинг."""
+    """Управляет жизненным циклом отчётов: приём, накопление, генерация, удаление.
+
+    Один проект = один отчёт. При повторной загрузке в тот же проект
+    новые результаты добавляются к существующим, HTML регенерируется.
+    """
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
@@ -49,67 +51,106 @@ class ReportManager:
     #  Публичные методы
     # ------------------------------------------------------------------ #
 
-    async def create_report(
+    async def upload_results(
         self,
         zip_bytes: bytes,
         project_name: str,
         build_id: str | None,
     ) -> dict:
-        """Принимает ZIP, генерирует отчёт, возвращает метаданные.
+        """Принимает ZIP, добавляет результаты к проекту, регенерирует отчёт.
+
+        Если проект существует — новые файлы allure-results сливаются
+        с уже имеющимися. Если нет — создаётся новый проект.
 
         Raises:
             InvalidArchiveError: архив битый или без allure-results/.
             AllureGenerationError: allure generate упал.
             AllureTimeoutError: превышён таймаут.
         """
-        report_id = build_id or str(uuid4())
-        created_at = datetime.now(timezone.utc).isoformat()
         project_dir = self._base_dir / project_name
-        report_dir = project_dir / report_id
-        report_dir.mkdir(parents=True, exist_ok=True)
+        results_dir = project_dir / "allure-results"
+        html_dir = project_dir / "html"
+        meta_file = project_dir / "meta.json"
+
+        is_new_project = not meta_file.exists()
+        now_iso = datetime.now(timezone.utc).isoformat()
 
         logger.info(
-            "create_report_start",
-            report_id=report_id,
+            "upload_results_start",
             project=project_name,
             zip_size=len(zip_bytes),
+            is_new_project=is_new_project,
         )
 
-        # 1. Распаковываем и валидируем ZIP
-        results_dir = report_dir / "allure-results"
-        try:
-            self._extract_and_validate(zip_bytes, results_dir)
-        except InvalidArchiveError:
-            shutil.rmtree(report_dir, ignore_errors=True)
-            raise
+        # 1. Распаковываем и валидируем ZIP во временную директорию
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_results = Path(tmp_dir) / "allure-results"
+            try:
+                self._extract_and_validate(zip_bytes, tmp_results)
+            except InvalidArchiveError:
+                raise
 
-        # 2. Генерируем HTML через Allure CLI
-        html_dir = report_dir / "html"
+            # 2. Сливаем результаты в целевую директорию проекта
+            project_dir.mkdir(parents=True, exist_ok=True)
+            results_dir.mkdir(parents=True, exist_ok=True)
+            added_count = self._merge_results(tmp_results, results_dir)
+
+        logger.info(
+            "results_merged",
+            project=project_name,
+            added_files=added_count,
+            is_new_project=is_new_project,
+        )
+
+        # 3. Регенерируем HTML из всех накопленных результатов
         try:
             self._run_allure_generate(results_dir, html_dir)
         except (AllureGenerationError, AllureTimeoutError):
-            shutil.rmtree(report_dir, ignore_errors=True)
             raise
 
-        # 3. Сохраняем метаданные
+        # 4. Обновляем метаданные
+        results_count = sum(1 for f in results_dir.rglob("*") if f.is_file())
         size_bytes = self._dir_size(html_dir)
-        meta = {
-            "id": report_id,
-            "project": project_name,
-            "url": f"/reports/{project_name}/{report_id}/index.html",
-            "created_at": created_at,
-            "size_bytes": size_bytes,
-        }
-        meta_file = report_dir / "meta.json"
-        meta_file.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
-        logger.info("create_report_done", report_id=report_id, project=project_name, size=size_bytes)
+        if is_new_project:
+            meta = {
+                "project": project_name,
+                "url": f"/reports/{project_name}/index.html",
+                "created_at": now_iso,
+                "updated_at": now_iso,
+                "size_bytes": size_bytes,
+                "uploads_count": 1,
+                "results_count": results_count,
+            }
+        else:
+            existing_meta = json.loads(meta_file.read_text(encoding="utf-8"))
+            existing_meta["updated_at"] = now_iso
+            existing_meta["size_bytes"] = size_bytes
+            existing_meta["uploads_count"] = existing_meta.get("uploads_count", 0) + 1
+            existing_meta["results_count"] = results_count
+            meta = existing_meta
+
+        meta_file.write_text(
+            json.dumps(meta, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        logger.info(
+            "upload_results_done",
+            project=project_name,
+            results_count=results_count,
+            uploads_count=meta["uploads_count"],
+            size=size_bytes,
+        )
         return meta
 
     async def list_reports(self, page: int = 1, page_size: int = 20) -> dict:
-        """Возвращает список отчётов с пагинацией, отсортированный по дате (новые сверху)."""
+        """Возвращает список проектов с пагинацией, отсортированный по дате обновления (новые сверху)."""
         all_reports = self._scan_reports()
-        all_reports.sort(key=lambda r: r["created_at"], reverse=True)
+        all_reports.sort(
+            key=lambda r: r.get("updated_at", r.get("created_at", "")),
+            reverse=True,
+        )
 
         total = len(all_reports)
         start = (page - 1) * page_size
@@ -123,30 +164,47 @@ class ReportManager:
             "page_size": page_size,
         }
 
-    async def get_report(self, project: str, report_id: str) -> dict | None:
-        """Возвращает метаданные конкретного отчёта или None."""
-        meta_file = self._base_dir / project / report_id / "meta.json"
+    async def get_report(self, project: str) -> dict | None:
+        """Возвращает метаданные проекта или None."""
+        meta_file = self._base_dir / project / "meta.json"
         if not meta_file.exists():
             return None
         return json.loads(meta_file.read_text(encoding="utf-8"))
 
-    async def delete_report(self, project: str, report_id: str) -> bool:
-        """Удаляет отчёт с диска. Возвращает True если удалён."""
-        report_dir = self._base_dir / project / report_id
-        if not report_dir.exists():
+    async def delete_report(self, project: str) -> bool:
+        """Удаляет проект со всеми результатами. Возвращает True если удалён."""
+        project_dir = self._base_dir / project
+        if not project_dir.exists():
             return False
-        shutil.rmtree(report_dir, ignore_errors=True)
-        logger.info("report_deleted", report_id=report_id, project=project)
+        shutil.rmtree(project_dir, ignore_errors=True)
+        logger.info("project_deleted", project=project)
         return True
 
-    def get_report_html_dir(self, project: str, report_id: str) -> Path | None:
-        """Возвращает путь к HTML-директории отчёта или None."""
-        html_dir = self._base_dir / project / report_id / "html"
+    def get_report_html_dir(self, project: str) -> Path | None:
+        """Возвращает путь к HTML-директории проекта или None."""
+        html_dir = self._base_dir / project / "html"
         return html_dir if html_dir.exists() else None
 
     # ------------------------------------------------------------------ #
     #  Приватные методы
     # ------------------------------------------------------------------ #
+
+    def _merge_results(self, src: Path, dest: Path) -> int:
+        """Копирует файлы результатов из *src* в *dest*, накапливая.
+
+        Файлы в allure-results имеют UUID-имена, поэтому коллизий нет.
+        Возвращает количество скопированных файлов.
+        """
+        count = 0
+        for item in src.rglob("*"):
+            if not item.is_file():
+                continue
+            rel = item.relative_to(src)
+            target = dest / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(item, target)
+            count += 1
+        return count
 
     def _extract_and_validate(self, zip_bytes: bytes, dest: Path) -> None:
         """Распаковывает ZIP в *dest* и проверяет наличие allure-results/.
@@ -164,11 +222,9 @@ class ReportManager:
         if bad is not None:
             raise InvalidArchiveError(f"Архив содержит повреждённый файл: {bad}")
 
-        # Ищем allure-results внутри архива
         names = zf.namelist()
         allure_prefix = None
         for name in names:
-            # Нормализуем путь
             parts = name.split("/")
             for i, part in enumerate(parts):
                 if part == ALLURE_RESULTS_DIR_NAME:
@@ -183,13 +239,11 @@ class ReportManager:
                 "Убедитесь, что ZIP содержит директорию allure-results/ с результатами тестов."
             )
 
-        # Распаковываем только содержимое allure-results/
         dest.mkdir(parents=True, exist_ok=True)
         prefix_len = len(allure_prefix)
         for name in names:
             if not name.startswith(allure_prefix):
                 continue
-            # Относительный путь внутри allure-results/
             rel = name[prefix_len:].lstrip("/")
             if not rel:
                 continue
@@ -242,7 +296,7 @@ class ReportManager:
         logger.info("allure_generate_done", html_dir=str(html_dir))
 
     def _scan_reports(self) -> list[dict]:
-        """Сканирует файловую систему и собирает метаданные всех отчётов."""
+        """Сканирует файловую систему и собирает метаданные всех проектов."""
         reports: list[dict] = []
         for meta_file in self._base_dir.rglob("meta.json"):
             try:
