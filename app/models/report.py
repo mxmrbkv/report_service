@@ -3,35 +3,25 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from uuid import uuid4
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _uuid() -> str:
-    return str(uuid4())
-
-
-class ReportCreateResponse:
-    """Ответ на POST /api/reports — возвращается вручную (dict)."""
-    pass
-
-
-# --- Pydantic v2 модели ---
-
 from pydantic import BaseModel, Field
 
 
 class ReportMeta(BaseModel):
-    """Метаданные одного отчёта."""
+    """Метаданные проекта-отчёта."""
 
-    id: str = Field(default_factory=_uuid)
     project: str = "default"
     url: str = ""
     created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
     size_bytes: int = 0
+    uploads_count: int = 0
+    results_count: int = 0
 
 
 class ReportListResponse(BaseModel):
@@ -44,10 +34,9 @@ class ReportListResponse(BaseModel):
 
 
 class ReportDeleteResponse(BaseModel):
-    """Ответ DELETE /api/reports/{project}/{id}."""
+    """Ответ DELETE /api/reports/{project}."""
 
     deleted: bool
-    id: str
     project: str
 
 

@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app.api.deps import get_report_manager
 from app.core.allure import (
@@ -16,31 +12,33 @@ from app.core.allure import (
     ReportManager,
 )
 from app.core.config import Settings, get_settings
-from app.models.report import ReportDeleteResponse, ReportListResponse, ReportMeta
+from app.models.report import (
+    ReportDeleteResponse,
+    ReportListResponse,
+    ReportMeta,
+)
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
 # ---------------------------------------------------------------------- #
-#  POST /api/reports — загрузка и генерация
+#  POST /api/reports — загрузка результатов в проект
 # ---------------------------------------------------------------------- #
 
 @router.post(
     "",
     response_model=ReportMeta,
     status_code=201,
-    summary="Загрузить ZIP и сгенерировать Allure-отчёт",
+    summary="Загрузить ZIP и добавить результаты в проект",
     responses={
         400: {"description": "Некорректный архив или нет allure-results/"},
         413: {"description": "Размер файла превышает лимит"},
         500: {"description": "Внутренняя ошибка при генерации"},
     },
 )
-async def create_report(
-    request: Request,
+async def upload_results(
     file: UploadFile = File(..., description="ZIP-архив с allure-results/"),
-    project_name: str = Form("default"),
-    build_id: str | None = Form(None),
+    project_name: str = Form("default", description="Имя проекта"),
     manager: ReportManager = Depends(get_report_manager),
     settings: Settings = Depends(get_settings),
 ) -> ReportMeta:
@@ -53,14 +51,14 @@ async def create_report(
             f"({settings.max_upload_size_mb} МБ).",
         )
 
-    # --- Проверка content-type / расширения ---
+    # --- Проверка расширения ---
     filename = file.filename or ""
     if not filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Ожидается файл с расширением .zip")
 
     # --- Генерация ---
     try:
-        meta = await manager.create_report(content, project_name, build_id)
+        meta = await manager.upload_results(content, project_name, build_id=None)
     except InvalidArchiveError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except AllureTimeoutError as exc:
@@ -72,13 +70,13 @@ async def create_report(
 
 
 # ---------------------------------------------------------------------- #
-#  GET /api/reports — список с пагинацией
+#  GET /api/reports — список проектов с пагинацией
 # ---------------------------------------------------------------------- #
 
 @router.get(
     "",
     response_model=ReportListResponse,
-    summary="Получить список всех отчётов",
+    summary="Получить список всех проектов",
 )
 async def list_reports(
     page: int = 1,
@@ -95,42 +93,40 @@ async def list_reports(
 
 
 # ---------------------------------------------------------------------- #
-#  GET /api/reports/{project}/{id} — метаданные одного отчёта
+#  GET /api/reports/{project} — метаданные проекта
 # ---------------------------------------------------------------------- #
 
 @router.get(
-    "/{project}/{report_id}",
+    "/{project}",
     response_model=ReportMeta,
-    summary="Получить метаданные конкретного отчёта",
-    responses={404: {"description": "Отчёт не найден"}},
+    summary="Получить метаданные проекта",
+    responses={404: {"description": "Проект не найден"}},
 )
 async def get_report(
     project: str,
-    report_id: str,
     manager: ReportManager = Depends(get_report_manager),
 ) -> ReportMeta:
-    meta = await manager.get_report(project, report_id)
+    meta = await manager.get_report(project)
     if meta is None:
-        raise HTTPException(status_code=404, detail="Отчёт не найден")
+        raise HTTPException(status_code=404, detail="Проект не найден")
     return ReportMeta(**meta)
 
 
 # ---------------------------------------------------------------------- #
-#  DELETE /api/reports/{project}/{id} — удаление
+#  DELETE /api/reports/{project} — удаление проекта
 # ---------------------------------------------------------------------- #
 
 @router.delete(
-    "/{project}/{report_id}",
+    "/{project}",
     response_model=ReportDeleteResponse,
-    summary="Удалить отчёт",
-    responses={404: {"description": "Отчёт не найден"}},
+    summary="Удалить проект и все его результаты",
+    responses={404: {"description": "Проект не найден"}},
 )
 async def delete_report(
     project: str,
-    report_id: str,
     manager: ReportManager = Depends(get_report_manager),
 ) -> ReportDeleteResponse:
-    deleted = await manager.delete_report(project, report_id)
+    deleted = await manager.delete_report(project)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Отчёт не найден")
-    return ReportDeleteResponse(deleted=True, id=report_id, project=project)
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    return ReportDeleteResponse(deleted=True, project=project)
