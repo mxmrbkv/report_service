@@ -1,0 +1,55 @@
+# .github/workflows/deploy.yml
+name: Deploy Allure Report
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # ручной запуск
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Java (для Allure CLI)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Install Allure CLI
+        run: |
+          curl -o allure.tgz -Ls             https://repo.maven.apache.org/maven2/io/qameta/allure/allure-commandline/2.27.0/allure-commandline-2.27.0.tgz
+          tar -xzf allure.tgz
+          echo "$PWD/allure-2.27.0/bin" >> $GITHUB_PATH
+      
+      - name: Run tests (пример для pytest)
+        run: |
+          pip install pytest allure-pytest
+          pytest tests/ --alluredir=allure-results || true
+      
+      - name: Generate Allure report
+        run: allure generate allure-results -o dist --clean
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
