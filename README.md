@@ -1,4 +1,4 @@
-# Allure Report Service
+# Report Service
 
 Внутренний сервис для загрузки, генерации и просмотра Allure-отчётов.
 QA-инженеры и CI/CD загружают ZIP-архив с результатами тестов (`allure-results/`),
