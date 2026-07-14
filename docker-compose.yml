@@ -1,0 +1,17 @@
+services:
+  allure-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: allure-service
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - reports_data:/app/data/reports
+    restart: unless-stopped
+
+volumes:
+  reports_data:
+    driver: local

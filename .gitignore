@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual env
+.venv/
+venv/
+
+# IDE
+.idea/
+
+# Env
+.env
+
+# Data (отчёты не коммитим)
+data/reports/*
+!data/reports/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
