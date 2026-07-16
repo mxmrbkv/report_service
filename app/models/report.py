@@ -43,4 +43,4 @@ class ReportDeleteResponse(BaseModel):
 class ErrorResponse(BaseModel):
     """Стандартное тело ошибки."""
 
-    detail: str
+    detail: str = Field(..., description="Описание ошибки", examples=["Проект не найден"])

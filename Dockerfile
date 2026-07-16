@@ -12,20 +12,18 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # ============================================================
 FROM python:3.12-slim AS runtime
 
-# Устанавливаем JDK (Allure требует Java) и скачиваем Allure CLI
+# Устанавливаем JDK (Allure требует Java)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        curl \
         default-jdk-headless \
         ca-certificates && \
-    curl -fsSL https://github.com/allure-framework/allure2/releases/download/2.44.0/allure-2.44.0.tgz \
-        -o /tmp/allure.tgz && \
-    tar -xzf /tmp/allure.tgz -C /opt/ && \
-    ln -s /opt/allure-2.44.0/bin/allure /usr/local/bin/allure && \
-    rm /tmp/allure.tgz && \
-    apt-get purge -y curl && \
-    apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
+
+# Копируем и распаковываем Allure CLI из локального архива
+COPY allure-2.44.0.tgz /tmp/allure.tgz
+RUN tar -xzf /tmp/allure.tgz -C /opt/ && \
+    ln -s /opt/allure-2.44.0/bin/allure /usr/local/bin/allure && \
+    rm /tmp/allure.tgz
 
 # Проверяем установку
 RUN allure --version

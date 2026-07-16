@@ -30,6 +30,7 @@
             --alert-success-bg: #c6f6d5;
             --alert-success-color: #22543d;
             --progress-track: #e2e8f0;
+            --input-bg: #ffffff;
         }
 
         [data-theme="dark"] {
@@ -57,6 +58,7 @@
             --alert-success-bg: #2d4a3e;
             --alert-success-color: #68d391;
             --progress-track: #3a3f54;
+            --input-bg: #2d3142;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -123,6 +125,8 @@
             font-size: 14px;
             outline: none;
             transition: border-color 0.15s;
+            background: var(--input-bg);
+            color: var(--text);
         }
         .form-field input:focus { border-color: var(--primary); }
 
@@ -246,6 +250,7 @@
             border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
+            color: var(--text);
         }
         .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
         .pagination .info { font-size: 14px; color: var(--text-muted); }
@@ -255,6 +260,11 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
         .theme-toggle {
             background: var(--btn-open-bg);
@@ -268,16 +278,108 @@
             color: var(--text);
         }
         .theme-toggle:hover { background: var(--btn-open-hover); }
+
+        /* User badge */
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--btn-open-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 14px;
+            color: var(--text);
+        }
+        .user-badge .avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .btn-logout {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-muted);
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .btn-logout:hover { background: var(--btn-open-hover); color: var(--danger); }
+
+        .btn-swagger {
+            background: var(--btn-open-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--primary);
+            text-decoration: none;
+            transition: background 0.15s;
+        }
+        .btn-swagger:hover { background: var(--btn-open-hover); }
+
+        /* Login overlay */
+        .login-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--bg);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-overlay.show { display: flex; }
+        .login-card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 48px 40px;
+            box-shadow: var(--shadow);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        .login-card .icon { font-size: 56px; margin-bottom: 16px; }
+        .login-card h2 { font-size: 22px; margin-bottom: 8px; }
+        .login-card p { color: var(--text-muted); font-size: 15px; margin-bottom: 28px; }
+        .login-card .btn { width: 100%; justify-content: center; padding: 14px; font-size: 16px; }
     </style>
 </head>
 <body>
+    <!-- Login overlay -->
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-card">
+            <div class="icon">🔐</div>
+            <h2>Авторизация</h2>
+            <p>Войдите через Keycloak, чтобы получить доступ к отчётам</p>
+            <button class="btn btn-primary" id="loginBtn">Войти через Keycloak</button>
+        </div>
+    </div>
+
     <header>
         <div class="header-content">
             <div>
                 <h1>📊 Report Service</h1>
                 <div class="subtitle">Загрузка, генерация и просмотр Allure-отчётов</div>
             </div>
-            <button class="theme-toggle" id="themeToggle" title="Переключить тему">🌙</button>
+            <div class="header-right">
+                <div class="user-badge" id="userBadge" style="display:none;">
+                    <div class="avatar" id="userAvatar"></div>
+                    <span id="userName"></span>
+                </div>
+                <button class="btn-logout" id="logoutBtn" style="display:none;">Выйти</button>
+                <a href="/docs" class="btn-swagger" title="Swagger UI — проверка API">API Docs</a>
+                <button class="theme-toggle" id="themeToggle" title="Переключить тему">🌙</button>
+            </div>
         </div>
     </header>
 
@@ -337,6 +439,8 @@
         let currentPage = 1;
         let totalPages = 1;
         let selectedFile = null;
+        let authEnabled = false;
+        let authenticated = false;
 
         // --- Elements ---
         const dropZone = document.getElementById('dropZone');
@@ -351,6 +455,74 @@
         const prevBtn = document.getElementById('prevBtn');
         const nextBtn = document.getElementById('nextBtn');
         const pageInfo = document.getElementById('pageInfo');
+        const loginOverlay = document.getElementById('loginOverlay');
+        const loginBtn = document.getElementById('loginBtn');
+        const userBadge = document.getElementById('userBadge');
+        const userAvatar = document.getElementById('userAvatar');
+        const userName = document.getElementById('userName');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        // --- Auth ---
+        async function checkAuth() {
+            try {
+                const resp = await fetch('/auth/me');
+                const data = await resp.json();
+                authEnabled = data.auth_enabled;
+                authenticated = data.authenticated;
+
+                if (authEnabled && !authenticated) {
+                    showLoginOverlay();
+                    return false;
+                }
+
+                hideLoginOverlay();
+                if (data.user) {
+                    showUserBadge(data.user);
+                }
+                return true;
+            } catch {
+                hideLoginOverlay();
+                return true;
+            }
+        }
+
+        function showLoginOverlay() {
+            loginOverlay.classList.add('show');
+        }
+
+        function hideLoginOverlay() {
+            loginOverlay.classList.remove('show');
+        }
+
+        function showUserBadge(user) {
+            userBadge.style.display = 'flex';
+            logoutBtn.style.display = 'inline-block';
+            userName.textContent = user.name || user.email || 'User';
+            const initials = (user.name || user.email || '?')
+                .split(/\s+/)
+                .map(w => w[0])
+                .slice(0, 2)
+                .join('')
+                .toUpperCase();
+            userAvatar.textContent = initials;
+        }
+
+        loginBtn.addEventListener('click', () => {
+            window.location.href = '/auth/login';
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            window.location.href = '/auth/logout';
+        });
+
+        // --- Handle 401: redirect to login ---
+        function handleUnauthorized() {
+            if (authEnabled) {
+                showLoginOverlay();
+                return true;
+            }
+            return false;
+        }
 
         // --- Drop zone events ---
         dropZone.addEventListener('click', () => fileInput.click());
@@ -390,6 +562,7 @@
 
             try {
                 const resp = await fetch(API, { method: 'POST', body: formData });
+                if (resp.status === 401) { handleUnauthorized(); return; }
                 const data = await resp.json();
                 if (!resp.ok) {
                     throw new Error(data.detail || 'Ошибка загрузки');
@@ -420,6 +593,7 @@
             currentPage = page;
             try {
                 const resp = await fetch(`${API}?page=${page}&page_size=20`);
+                if (resp.status === 401) { handleUnauthorized(); return; }
                 const data = await resp.json();
                 totalPages = Math.ceil(data.total / data.page_size) || 1;
 
@@ -457,6 +631,7 @@
             if (!confirm(`Удалить проект «${project}» со всеми результатами?`)) return;
             try {
                 const resp = await fetch(`${API}/${encodeURIComponent(project)}`, { method: 'DELETE' });
+                if (resp.status === 401) { handleUnauthorized(); return; }
                 if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Ошибка'); }
                 loadReports(currentPage);
             } catch (err) {
@@ -509,8 +684,11 @@
             localStorage.setItem('theme', next);
         });
 
-        // Init
-        loadReports(1);
+        // --- Init ---
+        (async () => {
+            const ok = await checkAuth();
+            if (ok) loadReports(1);
+        })();
     </script>
 </body>
 </html>
