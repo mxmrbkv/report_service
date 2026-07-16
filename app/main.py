@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import urllib.parse
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import structlog
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from starlette.middleware.sessions import SessionMiddleware
 
+from app.api.auth import router as auth_router
 from app.api.reports import router as reports_router
 from app.core.config import Settings, get_settings
 
@@ -51,9 +54,48 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="Allure Report Service",
-        description="Загрузка, генерация и хранение Allure-отчётов",
+        description=(
+            "## Сервис загрузки, генерации и хранения Allure-отчётов\n\n"
+            "### Возможности\n"
+            "- Загрузка ZIP-архивов с результатами тестов (allure-results)\n"
+            "- Автоматическая генерация HTML-отчётов через Allure CLI\n"
+            "- Накопление результатов: повторные загрузки добавляются к проекту\n"
+            "- Просмотр отчётов напрямую из сервиса\n"
+            "- Авторизация через Keycloak (OIDC)\n\n"
+            "### Авторизация\n"
+            "Если `AUTH_ENABLED=true` — все API-методы требуют авторизацию.\n"
+            "Войдите через веб-интерфейс (`/`) или кнопку «Войти через Keycloak»,\n"
+            "после чего сессионная cookie будет автоматически передаваться в запросах из Swagger UI.\n\n"
+            "### Ссылки\n"
+            "- Веб-интерфейс: [/](/)\n"
+            "- ReDoc: [/redoc](/redoc)\n"
+        ),
         version="1.0.0",
         lifespan=lifespan,
+        openapi_tags=[
+            {
+                "name": "reports",
+                "description": "Управление Allure-отчётами: загрузка, просмотр, удаление.",
+            },
+            {
+                "name": "auth",
+                "description": "Авторизация через Keycloak: логин, callback, logout, профиль пользователя.",
+            },
+        ],
+        swagger_ui_parameters={
+            "persistAuthorization": True,
+            "displayRequestDuration": True,
+            "docExpansion": "none",
+            "filter": True,
+        },
+    )
+
+    # --- Session middleware (для OAuth2-сессий) ---
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=settings.session_secret,
+        session_cookie="report_service_session",
+        max_age=86400,  # 24 часа
     )
 
     # --- CORS ---
@@ -66,6 +108,7 @@ def create_app() -> FastAPI:
     )
 
     # --- Роутеры ---
+    app.include_router(auth_router)
     app.include_router(reports_router)
 
     # --- Статика: веб-интерфейс ---
@@ -78,7 +121,12 @@ def create_app() -> FastAPI:
     reports_base = settings.reports_path
 
     @app.get("/reports/{project}/{file_path:path}", include_in_schema=False)
-    async def serve_report(project: str, file_path: str):
+    async def serve_report(request: Request, project: str, file_path: str):
+        # --- Авторизация ---
+        if settings.auth_enabled and not request.session.get("user"):
+            next_url = urllib.parse.quote(f"/reports/{project}/{file_path}", safe="")
+            return RedirectResponse(url=f"/auth/login?next={next_url}")
+
         # Предотвращаем path traversal
         if ".." in file_path or ".." in project:
             raise HTTPException(status_code=400, detail="Недопустимый путь")

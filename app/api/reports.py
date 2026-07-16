@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from app.api.deps import get_report_manager
+from app.api.deps import get_report_manager, require_auth
 from app.core.allure import (
     AllureGenerationError,
     AllureTimeoutError,
@@ -13,6 +13,7 @@ from app.core.allure import (
 )
 from app.core.config import Settings, get_settings
 from app.models.report import (
+    ErrorResponse,
     ReportDeleteResponse,
     ReportListResponse,
     ReportMeta,
@@ -41,6 +42,7 @@ async def upload_results(
     project_name: str = Form("default", description="Имя проекта"),
     manager: ReportManager = Depends(get_report_manager),
     settings: Settings = Depends(get_settings),
+    _user=Depends(require_auth),
 ) -> ReportMeta:
     # --- Проверка размера ---
     content = await file.read()
@@ -77,11 +79,23 @@ async def upload_results(
     "",
     response_model=ReportListResponse,
     summary="Получить список всех проектов",
+    description=(
+        "Возвращает список проектов с пагинацией, "
+        "отсортированный по дате последнего обновления (новые сверху).\n\n"
+        "Параметры пагинации:\n"
+        "- `page` — номер страницы (начиная с 1)\n"
+        "- `page_size` — размер страницы (1–100, по умолчанию 20)\n"
+    ),
+    response_description="Список проектов с пагинацией",
+    responses={
+        401: {"description": "Не авторизован", "model": ErrorResponse},
+    },
 )
 async def list_reports(
     page: int = 1,
     page_size: int = 20,
     manager: ReportManager = Depends(get_report_manager),
+    _user=Depends(require_auth),
 ) -> ReportListResponse:
     if page < 1:
         page = 1
@@ -105,6 +119,7 @@ async def list_reports(
 async def get_report(
     project: str,
     manager: ReportManager = Depends(get_report_manager),
+    _user=Depends(require_auth),
 ) -> ReportMeta:
     meta = await manager.get_report(project)
     if meta is None:
@@ -125,6 +140,7 @@ async def get_report(
 async def delete_report(
     project: str,
     manager: ReportManager = Depends(get_report_manager),
+    _user=Depends(require_auth),
 ) -> ReportDeleteResponse:
     deleted = await manager.delete_report(project)
     if not deleted:
