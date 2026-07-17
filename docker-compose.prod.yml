@@ -1,0 +1,23 @@
+# Production-конфигурация: только report-service, без Keycloak.
+# Авторизация выключена по умолчанию (AUTH_ENABLED=false).
+#
+# Использование на сервере:
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+services:
+  allure-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: allure-service
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.prod
+    volumes:
+      - reports_data:/app/data/reports
+    restart: unless-stopped
+
+volumes:
+  reports_data:
+    driver: local
