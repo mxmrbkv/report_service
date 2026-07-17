@@ -16,7 +16,7 @@ services:
         condition: service_started
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0
+    image: quay.io/keycloak/keycloak:22.0.5
     container_name: keycloak
     ports:
       - "8081:8080"

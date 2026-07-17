@@ -14,6 +14,7 @@ venv/
 
 # Env
 .env
+.env.prod
 
 # Data (отчёты не коммитим)
 data/reports/*
