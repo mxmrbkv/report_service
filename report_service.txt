@@ -1,0 +1,74 @@
+Добавление проекта на сервер
+
+# Обновляем систему
+apt update && apt upgrade -y
+
+# Меняем часовой пояс на московский (опционально)
+timedatectl set-timezone Europe/Moscow
+
+# Меняем пароль root
+passwd
+
+# Создаём обычного пользователя (работать от root постоянно — плохая практика)
+adduser deploy
+usermod -aG sudo deploy
+
+# Устанавливаем зависимости
+apt install curl git ufw -y
+
+# Официальный скрипт установки Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+
+# Добавляем пользователя deploy в группу docker (чтобы не нужен был sudo)
+usermod -aG docker deploy
+
+# Проверяем установку
+docker --version
+docker compose version
+
+# Переключаемся на пользователя deploy
+su - deploy
+
+# Создаём папку для проектов
+mkdir -p ~/projects && cd ~/projects
+
+# Клонируем репозиторий
+git clone https://github.com/username/myproject.git
+cd myproject
+
+# Если есть .env.example — создаём реальный .env
+cp .env.example .env
+nano .env   # редактируем пароли и настройки
+
+Запуск проекта
+
+cd ~/projects/myproject   # или где у вас лежит проект
+
+# Собираем и запускаем в фоне
+docker compose up -d --build
+
+# Смотрим, что запустилось
+docker ps
+
+# Смотрим логи, если что-то пошло не так
+docker compose logs -f
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+Пуш обновлений на сервер
+
+Перейти на сервер:
+ssh root@80.78.241.243 / qPYg65gE6XV2EpoF
+
+Перейти в папку проекта:
+cd /home/deploy/projects/report_service
+
+Залить изменения из git:
+git config --global --add safe.directory /home/deploy/projects/report_service
+git pull origin main
+
+Перезапустить docker:
+docker compose down
+docker compose up -d --build
+
