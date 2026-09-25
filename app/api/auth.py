@@ -147,6 +147,8 @@ async def callback(
     }
 
     request.session["user"] = user
+    if id_token:
+        request.session["id_token"] = id_token
     request.session.pop("oauth_state", None)
 
     next_url = request.session.pop("oauth_next", "/")
@@ -161,14 +163,18 @@ async def logout(
 ) -> RedirectResponse:
     """Очищает локальную сессию и перенаправляет на Keycloak end_session."""
     user = request.session.get("user")
+    id_token = request.session.get("id_token")
     request.session.clear()
 
     if settings.auth_enabled:
-        # Keycloak end_session_endpoint — завершает сессию и на стороне IdP
+        # Keycloak end_session_endpoint — завершает сессию и на стороне IdP.
+        # id_token_hint помогает Keycloak однозначно определить сессию для завершения.
         params = {
             "client_id": settings.keycloak_client_id,
             "post_logout_redirect_uri": settings.post_logout_redirect_uri,
         }
+        if id_token:
+            params["id_token_hint"] = id_token
         logout_url = f"{settings.keycloak_logout_url}?{urllib.parse.urlencode(params)}"
         logger.info("keycloak_logout_redirect", user=user.get("name") if user else None)
         return RedirectResponse(url=logout_url)
