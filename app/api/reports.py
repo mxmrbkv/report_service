@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from app.api.deps import get_report_manager, require_auth
+from app.api.deps import get_report_manager, require_auth, require_role
 from app.core.allure import (
     AllureGenerationError,
     AllureTimeoutError,
@@ -33,6 +33,7 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
     summary="Загрузить ZIP и добавить результаты в проект",
     responses={
         400: {"description": "Некорректный архив или нет allure-results/"},
+        403: {"description": "Недостаточно прав (требуется роль reporter+)"},
         413: {"description": "Размер файла превышает лимит"},
         500: {"description": "Внутренняя ошибка при генерации"},
     },
@@ -42,7 +43,7 @@ async def upload_results(
     project_name: str = Form("default", description="Имя проекта"),
     manager: ReportManager = Depends(get_report_manager),
     settings: Settings = Depends(get_settings),
-    _user=Depends(require_auth),
+    _user=Depends(require_role("reporter")),
 ) -> ReportMeta:
     # --- Проверка размера ---
     content = await file.read()
@@ -135,12 +136,15 @@ async def get_report(
     "/{project}",
     response_model=ReportDeleteResponse,
     summary="Удалить проект и все его результаты",
-    responses={404: {"description": "Проект не найден"}},
+    responses={
+        403: {"description": "Недостаточно прав (требуется роль admin)"},
+        404: {"description": "Проект не найден"},
+    },
 )
 async def delete_report(
     project: str,
     manager: ReportManager = Depends(get_report_manager),
-    _user=Depends(require_auth),
+    _user=Depends(require_role("admin")),
 ) -> ReportDeleteResponse:
     deleted = await manager.delete_report(project)
     if not deleted:

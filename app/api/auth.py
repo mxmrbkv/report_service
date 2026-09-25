@@ -134,6 +134,16 @@ async def callback(
             user_info = user_resp.json()
 
     # --- Нормализуем профиль под единый формат ---
+    # Извлекаем realm-роли из claim realm_access.roles (настроено в Keycloak
+    # client scope "roles": mapper "realm roles" с id.token.claim=true).
+    realm_access = user_info.get("realm_access") or {}
+    roles = [
+        r for r in (realm_access.get("roles") or [])
+        if r in ("viewer", "reporter", "admin")
+    ]
+    if not roles:
+        roles = ["viewer"]
+
     user = {
         "sub": str(user_info.get("sub") or ""),
         "name": (
@@ -144,6 +154,7 @@ async def callback(
         ),
         "email": user_info.get("email") or "",
         "provider": "keycloak",
+        "roles": roles,
     }
 
     request.session["user"] = user
