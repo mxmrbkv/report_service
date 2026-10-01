@@ -10,11 +10,13 @@ import structlog
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.auth import router as auth_router
 from app.api.reports import router as reports_router
 from app.core.config import Settings, get_settings
+from app.models.db import init_db
 
 # --- structlog setup ---
 
@@ -44,6 +46,7 @@ logger = structlog.get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    await init_db()
     logger.info("startup", host=settings.host, port=settings.port)
     yield
     logger.info("shutdown")
@@ -114,6 +117,7 @@ def create_app() -> FastAPI:
     # --- Статика: веб-интерфейс ---
     static_dir = Path(__file__).parent / "static"
     static_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
     # --- Раздача Allure-отчётов ---
     # URL:  /reports/{project}/index.html

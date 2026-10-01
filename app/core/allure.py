@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import shutil
@@ -86,14 +87,14 @@ class ReportManager:
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_results = Path(tmp_dir) / "allure-results"
             try:
-                self._extract_and_validate(zip_bytes, tmp_results)
+                await asyncio.to_thread(self._extract_and_validate, zip_bytes, tmp_results)
             except InvalidArchiveError:
                 raise
 
             # 2. Сливаем результаты в целевую директорию проекта
             project_dir.mkdir(parents=True, exist_ok=True)
             results_dir.mkdir(parents=True, exist_ok=True)
-            added_count = self._merge_results(tmp_results, results_dir)
+            added_count = await asyncio.to_thread(self._merge_results, tmp_results, results_dir)
 
         logger.info(
             "results_merged",
@@ -104,7 +105,7 @@ class ReportManager:
 
         # 3. Регенерируем HTML из всех накопленных результатов
         try:
-            self._run_allure_generate(results_dir, html_dir)
+            await self._run_allure_generate(results_dir, html_dir)
         except (AllureGenerationError, AllureTimeoutError):
             raise
 
@@ -112,28 +113,44 @@ class ReportManager:
         results_count = sum(1 for f in results_dir.rglob("*") if f.is_file())
         size_bytes = self._dir_size(html_dir)
 
-        if is_new_project:
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+
+        from app.models.db import Project, AsyncSessionLocal
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as session:
+            stmt = select(Project).where(Project.name == project_name)
+            result = await session.execute(stmt)
+            project_obj = result.scalar_one_or_none()
+
+            if project_obj is None:
+                project_obj = Project(
+                    name=project_name,
+                    created_at=now,
+                    updated_at=now,
+                    size_bytes=size_bytes,
+                    uploads_count=1,
+                    results_count=results_count
+                )
+                session.add(project_obj)
+            else:
+                project_obj.updated_at = now
+                project_obj.size_bytes = size_bytes
+                project_obj.uploads_count += 1
+                project_obj.results_count = results_count
+
+            await session.commit()
+            
             meta = {
                 "project": project_name,
                 "url": f"/reports/{project_name}/index.html",
-                "created_at": now_iso,
-                "updated_at": now_iso,
+                "created_at": project_obj.created_at.isoformat(),
+                "updated_at": project_obj.updated_at.isoformat(),
                 "size_bytes": size_bytes,
-                "uploads_count": 1,
+                "uploads_count": project_obj.uploads_count,
                 "results_count": results_count,
             }
-        else:
-            existing_meta = json.loads(meta_file.read_text(encoding="utf-8"))
-            existing_meta["updated_at"] = now_iso
-            existing_meta["size_bytes"] = size_bytes
-            existing_meta["uploads_count"] = existing_meta.get("uploads_count", 0) + 1
-            existing_meta["results_count"] = results_count
-            meta = existing_meta
-
-        meta_file.write_text(
-            json.dumps(meta, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
 
         logger.info(
             "upload_results_done",
@@ -146,16 +163,28 @@ class ReportManager:
 
     async def list_reports(self, page: int = 1, page_size: int = 20) -> dict:
         """Возвращает список проектов с пагинацией, отсортированный по дате обновления (новые сверху)."""
-        all_reports = self._scan_reports()
-        all_reports.sort(
-            key=lambda r: r.get("updated_at", r.get("created_at", "")),
-            reverse=True,
-        )
+        from app.models.db import Project, AsyncSessionLocal
+        from sqlalchemy import select, func
 
-        total = len(all_reports)
-        start = (page - 1) * page_size
-        end = start + page_size
-        items = all_reports[start:end]
+        async with AsyncSessionLocal() as session:
+            count_stmt = select(func.count(Project.name))
+            total = await session.scalar(count_stmt) or 0
+
+            stmt = select(Project).order_by(Project.updated_at.desc()).offset((page - 1) * page_size).limit(page_size)
+            result = await session.execute(stmt)
+            projects = result.scalars().all()
+
+        items = []
+        for p in projects:
+            items.append({
+                "project": p.name,
+                "url": f"/reports/{p.name}/index.html",
+                "created_at": p.created_at.isoformat(),
+                "updated_at": p.updated_at.isoformat(),
+                "size_bytes": p.size_bytes,
+                "uploads_count": p.uploads_count,
+                "results_count": p.results_count,
+            })
 
         return {
             "items": items,
@@ -166,19 +195,45 @@ class ReportManager:
 
     async def get_report(self, project: str) -> dict | None:
         """Возвращает метаданные проекта или None."""
-        meta_file = self._base_dir / project / "meta.json"
-        if not meta_file.exists():
+        from app.models.db import Project, AsyncSessionLocal
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as session:
+            stmt = select(Project).where(Project.name == project)
+            result = await session.execute(stmt)
+            p = result.scalar_one_or_none()
+
+        if not p:
             return None
-        return json.loads(meta_file.read_text(encoding="utf-8"))
+
+        return {
+            "project": p.name,
+            "url": f"/reports/{p.name}/index.html",
+            "created_at": p.created_at.isoformat(),
+            "updated_at": p.updated_at.isoformat(),
+            "size_bytes": p.size_bytes,
+            "uploads_count": p.uploads_count,
+            "results_count": p.results_count,
+        }
 
     async def delete_report(self, project: str) -> bool:
         """Удаляет проект со всеми результатами. Возвращает True если удалён."""
+        from app.models.db import Project, AsyncSessionLocal
+        from sqlalchemy import delete
+
+        async with AsyncSessionLocal() as session:
+            stmt = delete(Project).where(Project.name == project)
+            result = await session.execute(stmt)
+            await session.commit()
+            deleted = result.rowcount > 0
+
         project_dir = self._base_dir / project
-        if not project_dir.exists():
-            return False
-        shutil.rmtree(project_dir, ignore_errors=True)
-        logger.info("project_deleted", project=project)
-        return True
+        if project_dir.exists():
+            shutil.rmtree(project_dir, ignore_errors=True)
+            
+        if deleted:
+            logger.info("project_deleted", project=project)
+        return deleted
 
     def get_report_html_dir(self, project: str) -> Path | None:
         """Возвращает путь к HTML-директории проекта или None."""
@@ -257,9 +312,9 @@ class ReportManager:
 
         logger.debug("zip_extracted", dest=str(dest), file_count=len(names))
 
-    def _run_allure_generate(self, results_dir: Path, html_dir: Path) -> None:
-        """Вызывает `allure generate <results> -o <html>` через subprocess."""
-        import subprocess
+    async def _run_allure_generate(self, results_dir: Path, html_dir: Path) -> None:
+        """Вызывает `allure generate <results> -o <html>` через asyncio subprocess."""
+        import asyncio
 
         cmd = [
             "allure",
@@ -272,40 +327,37 @@ class ReportManager:
         logger.info("allure_generate_start", cmd=" ".join(cmd))
 
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=self._settings.allure_timeout_seconds,
-                check=False,
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-        except subprocess.TimeoutExpired as exc:
-            raise AllureTimeoutError(
-                f"Генерация отчёта превысила таймаут {self._settings.allure_timeout_seconds} сек."
-            ) from exc
+            
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(), 
+                    timeout=self._settings.allure_timeout_seconds
+                )
+            except asyncio.TimeoutError as exc:
+                process.kill()
+                await process.communicate()
+                raise AllureTimeoutError(
+                    f"Генерация отчёта превысила таймаут {self._settings.allure_timeout_seconds} сек."
+                ) from exc
+                
         except FileNotFoundError as exc:
             raise AllureGenerationError(
                 "Allure CLI не найден. Убедитесь, что 'allure' установлен и доступен в PATH."
             ) from exc
 
-        if result.returncode != 0:
-            stderr = result.stderr.strip() or "неизвестная ошибка"
-            logger.error("allure_generate_failed", returncode=result.returncode, stderr=stderr)
-            raise AllureGenerationError(f"Allure CLI завершился с ошибкой: {stderr}")
+        if process.returncode != 0:
+            err_text = stderr.decode(errors='ignore').strip() if stderr else "неизвестная ошибка"
+            logger.error("allure_generate_failed", returncode=process.returncode, stderr=err_text)
+            raise AllureGenerationError(f"Allure CLI завершился с ошибкой: {err_text}")
 
         logger.info("allure_generate_done", html_dir=str(html_dir))
 
-    def _scan_reports(self) -> list[dict]:
-        """Сканирует файловую систему и собирает метаданные всех проектов."""
-        reports: list[dict] = []
-        for meta_file in self._base_dir.rglob("meta.json"):
-            try:
-                meta = json.loads(meta_file.read_text(encoding="utf-8"))
-                reports.append(meta)
-            except (json.JSONDecodeError, OSError):
-                logger.warning("meta_read_failed", path=str(meta_file))
-                continue
-        return reports
+
 
     @staticmethod
     def _dir_size(path: Path) -> int:

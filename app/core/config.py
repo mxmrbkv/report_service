@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -49,6 +50,12 @@ class Settings(BaseSettings):
     # Публичный URL сервиса (для OAuth redirect_uri и post-logout redirect).
     # На локалке: http://localhost:8080, на проде: http://185.46.10.125:8080
     public_url: str = "http://localhost:8080"
+
+    @model_validator(mode="after")
+    def validate_security(self) -> "Settings":
+        if self.auth_enabled and self.session_secret == "change-me-in-production":
+            raise ValueError("session_secret MUST be changed in production when auth_enabled=True")
+        return self
 
     @property
     def max_upload_size_bytes(self) -> int:
