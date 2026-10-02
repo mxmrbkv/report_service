@@ -143,7 +143,9 @@ def create_app() -> FastAPI:
 
     # --- Главная страница ---
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
-    async def index():
+    async def index(request: Request):
+        if settings.auth_enabled and not request.session.get("user"):
+            return RedirectResponse(url="/auth/login?next=/")
         index_html = static_dir / "index.html"
         if index_html.exists():
             return FileResponse(index_html)

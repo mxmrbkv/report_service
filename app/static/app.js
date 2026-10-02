@@ -50,7 +50,7 @@ async function checkAuth() {
         authenticated = data.authenticated;
 
         if (authEnabled && !authenticated) {
-            showLoginOverlay();
+            window.location.href = '/auth/login?next=' + encodeURIComponent(window.location.pathname + window.location.search);
             return false;
         }
 
@@ -108,7 +108,7 @@ if (logoutBtn) {
 
 function handleUnauthorized() {
     if (authEnabled) { 
-        showLoginOverlay(); 
+        window.location.href = '/auth/login?next=' + encodeURIComponent(window.location.pathname + window.location.search);
         return true; 
     }
     return false;
