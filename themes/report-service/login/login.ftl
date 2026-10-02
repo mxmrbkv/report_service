@@ -61,7 +61,12 @@
                             <line x1="12" y1="8" x2="12" y2="12"></line>
                             <line x1="12" y1="16" x2="12.01" y2="16"></line>
                         </svg>
-                        <span>${kcSanitize(messagesPerField.getFirstError('username','password'))?no_esc}</span>
+                        <#assign fieldError = messagesPerField.getFirstError('username','password')>
+                        <#if fieldError?contains("Invalid username or password") || fieldError?contains("Неверные имя пользователя или пароль")>
+                            <span>Неверный логин или пароль</span>
+                        <#else>
+                            <span>${kcSanitize(fieldError)?no_esc}</span>
+                        </#if>
                     </div>
                 </#if>
 

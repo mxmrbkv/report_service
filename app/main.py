@@ -56,7 +56,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="Allure Report Service",
+        title="Сервис отчетов",
         description=(
             "## Сервис загрузки, генерации и хранения Allure-отчётов\n\n"
             "### Возможности\n"
@@ -149,7 +149,7 @@ def create_app() -> FastAPI:
         index_html = static_dir / "index.html"
         if index_html.exists():
             return FileResponse(index_html)
-        return HTMLResponse("<h1>Report Service</h1>", status_code=200)
+        return HTMLResponse("<h1>Сервис отчетов</h1>", status_code=200)
 
     # --- Health check ---
     @app.get("/health", include_in_schema=False)

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report Service</title>
+    <title>Сервис отчетов</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -46,13 +46,13 @@
                         <path fill="url(#rtOrangeGrad)" d="m 18.326863,369.67 c 0.22,0.09 0.44,0.19 0.67,0.27 0.23,0.08 0.43,0.13 0.73,0.2 2.6646,0.834 5.438,1.268 8.23,1.29 H 173.04696 l -95.150097,-95.4 -0.05,0.05 c -17.6,17.49 -29.23,29 -37.8,37.58 -7.61,7.59 -12.81,12.81 -17.63,17.69 l -10.13,10.11 c -3.08,3.359 -4.78596,7.752 -4.78001,12.31 -0.00171,3.43 1.02952,6.781 2.95941,9.617 1.9299,2.836 4.669,5.026 7.8606,6.283 z"/>
                     </svg>
                 </div>
-                <h1>REPORT<br>SERVICE</h1>
+                <h1>Сервис<br>отчетов</h1>
             </div>
 
             <nav class="nav-menu">
                 <a href="#" class="nav-item active">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                    Dashboard
+                    Панель управления
                 </a>
                 <a href="/docs" class="nav-item" target="_blank">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
@@ -81,23 +81,23 @@
         <main class="main-content">
             <div class="dashboard-wrap">
                 <header class="top-bar">
-                    <h2>Dashboard Overview</h2>
+                    <h2>Панель управления</h2>
                 </header>
 
                 <div class="dashboard-grid">
                 <!-- Upload Panel -->
                 <div class="glass-panel upload-panel" id="uploadCard">
                     <div class="panel-header">
-                        <h3>REPORT MANAGEMENT</h3>
+                        <h3>Управление отчетами</h3>
                     </div>
                     <div class="upload-content">
                         <div class="drop-zone glass-panel-inner" id="dropZone">
                             <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                             <div class="upload-text">
-                                <strong>Upload Data File</strong>
-                                <span>Drag & drop ZIP с allure-results</span>
+                                <strong>Загрузить файл</strong>
+                                <span>Перетащите ZIP-архив с allure-results</span>
                             </div>
-                            <button class="btn btn-accent btn-sm" onclick="document.getElementById('fileInput').click()">Browse</button>
+                            <button class="btn btn-accent btn-sm" onclick="document.getElementById('fileInput').click()">Выбрать</button>
                             <input type="file" id="fileInput" accept=".zip" hidden>
                         </div>
                         <p class="filename" id="fileName" style="display:none;"></p>
@@ -105,7 +105,7 @@
                         <div class="form-row">
                             <input type="text" id="projectName" class="neon-input" value="default" placeholder="Project Name">
                         </div>
-                        <button class="btn btn-primary btn-full neon-btn" id="uploadBtn" disabled>Generate New Report</button>
+                        <button class="btn btn-primary btn-full neon-btn" id="uploadBtn" disabled>Загрузить отчет</button>
                         
                         <div class="progress-wrap" id="progressBar" style="display:none;">
                             <div class="progress-bar"><div class="fill"></div></div>
@@ -118,16 +118,16 @@
                 <!-- Projects Table Panel -->
                 <div class="glass-panel table-panel">
                     <div class="panel-header">
-                        <h3>Recent Reports</h3>
+                        <h3>Отчеты</h3>
                         <span class="meta" id="reportsMeta"></span>
                     </div>
                     
                     <div class="custom-table">
                         <div class="table-header">
-                            <div class="col col-name">Report Name</div>
-                            <div class="col col-status">Status</div>
-                            <div class="col col-date">Updated</div>
-                            <div class="col col-actions">Actions</div>
+                            <div class="col col-name">Имя проекта</div>
+                            <div class="col col-status">Статус</div>
+                            <div class="col col-date">Обновление</div>
+                            <div class="col col-actions">Действие</div>
                         </div>
                         <div class="table-body" id="reportsBody">
                             <div class="empty-state">Loading...</div>

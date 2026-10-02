@@ -164,10 +164,10 @@ body {
 
 .brand-text h1 {
     font-family: var(--font-display);
-    font-size: 16px;
+    font-size: 21px;
     font-weight: 800;
     line-height: 1.15;
-    letter-spacing: 1.5px;
+    letter-spacing: 1px;
     background: var(--grad-primary);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;

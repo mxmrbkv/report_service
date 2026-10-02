@@ -8,7 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
 
-    <title>${msg("loginTitle",(realm.displayName!'Report Service'))}</title>
+    <title>Вход в систему сервиса отчетов</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -58,7 +58,7 @@
                     </svg>
                 </div>
                 <div class="brand-text">
-                    <h1>REPORT<br>SERVICE</h1>
+                    <h1>Сервис<br>отчетов</h1>
                     <span class="brand-sub">Авторизация в системе</span>
                 </div>
             </div>
@@ -80,7 +80,11 @@
                     <#else>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                     </#if>
-                    <span>${kcSanitize(message.summary)?no_esc}</span>
+                    <#if message.summary?contains("Invalid username or password") || message.summary?contains("Неверные имя пользователя или пароль")>
+                        <span>Неверный логин или пароль</span>
+                    <#else>
+                        <span>${kcSanitize(message.summary)?no_esc}</span>
+                    </#if>
                 </div>
             </#if>
 
