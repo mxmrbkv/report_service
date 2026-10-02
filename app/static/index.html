@@ -3,136 +3,147 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report Service — Allure</title>
+    <title>Report Service</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <div class="aurora"><div class="blob3"></div></div>
-    <div class="grid-overlay"></div>
-    <div class="grain"></div>
+    <div class="grid-bg"></div>
+    <div class="glow-orb purple"></div>
+    <div class="glow-orb blue"></div>
 
     <!-- Login overlay -->
     <div class="login-overlay" id="loginOverlay">
-        <div class="login-card">
+        <div class="glass-panel login-card">
             <div class="login-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             </div>
             <h2>Войдите в аккаунт</h2>
-            <p>Авторизация через Keycloak required для доступа к отчётам и загрузке результатов</p>
-            <button class="btn btn-primary" id="loginBtn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-                Войти через Keycloak
-            </button>
+            <p>Авторизация через Keycloak обязательна.</p>
+            <button class="btn btn-primary" id="loginBtn">Войти через Keycloak</button>
         </div>
     </div>
 
-    <header>
-        <div class="header-content">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar glass-panel">
             <div class="brand">
-                <div class="brand-mark">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+                <div class="brand-icon">
+                    <svg viewBox="0 0 225 372" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="rtPurpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#C084FC"/>
+                                <stop offset="100%" stop-color="#7E22CE"/>
+                            </linearGradient>
+                            <linearGradient id="rtOrangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#FB923C"/>
+                                <stop offset="100%" stop-color="#EA580C"/>
+                            </linearGradient>
+                        </defs>
+                        <path fill="url(#rtPurpleGrad)" d="m 7.496873,353.79 c -0.00594,-4.557 1.69999,-8.951 4.77999,-12.31 v 0 l 10.13,-10.11 c 4.82,-4.88 10,-10.1 17.63,-17.69 8.57,-8.54 20.2,-20.09 37.8,-37.58 l 0.05,-0.05 17.15,-17.07 0.35,-0.34 C 123.86696,230.32 164.38696,189.97 223.88696,130.72 L 93.226863,0 l -74,74.06 C -2.863127,96.16 0.136874,110.63 0.136874,140.33 v 203.19 c -2.36e-4,5.694 1.742649,11.253 4.994419,15.927 3.25177,4.675 7.85657,8.242 13.19557,10.223 v 0 c -3.1903,-1.254 -5.9293,-3.44 -7.8608,-6.272 -1.93152,-2.832 -2.9661,-6.18 -2.96919,-9.608 z"/>
+                        <path fill="url(#rtOrangeGrad)" d="m 18.326863,369.67 c 0.22,0.09 0.44,0.19 0.67,0.27 0.23,0.08 0.43,0.13 0.73,0.2 2.6646,0.834 5.438,1.268 8.23,1.29 H 173.04696 l -95.150097,-95.4 -0.05,0.05 c -17.6,17.49 -29.23,29 -37.8,37.58 -7.61,7.59 -12.81,12.81 -17.63,17.69 l -10.13,10.11 c -3.08,3.359 -4.78596,7.752 -4.78001,12.31 -0.00171,3.43 1.02952,6.781 2.95941,9.617 1.9299,2.836 4.669,5.026 7.8606,6.283 z"/>
+                    </svg>
                 </div>
-                <div class="brand-text">
-                    <h1>Report Service</h1>
-                    <div class="subtitle">Загрузка, генерация и просмотр Allure-отчётов</div>
-                </div>
+                <h1>REPORT<br>SERVICE</h1>
             </div>
-            <div class="header-right">
-                <div class="role-pill" id="rolePill" style="display:none;">viewer</div>
-                <div class="user-badge" id="userBadge">
-                    <div class="avatar" id="userAvatar"></div>
-                    <span id="userName"></span>
-                </div>
-                <button class="hbtn btn-logout" id="logoutBtn" style="display:none;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                    Выйти
-                </button>
-                <a href="/docs" class="hbtn" title="Swagger UI — проверка API">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                    API
+
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    Dashboard
                 </a>
-                <button class="hbtn theme-toggle" id="themeToggle" title="Переключить тему">
-                    <span class="icon" id="themeIcon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                    </span>
-                </button>
-            </div>
-        </div>
-    </header>
+                <a href="/docs" class="nav-item" target="_blank">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                    API Swagger
+                </a>
+            </nav>
 
-    <div class="container">
-        <!-- Upload -->
-        <div class="card upload-card" id="uploadCard">
-            <div class="card-head">
-                <h2><span class="dot"></span> Загрузить результаты</h2>
-                <span class="meta" id="uploadMeta">ZIP с allure-results/</span>
-            </div>
-            <div class="drop-zone" id="dropZone">
-                <div class="drop-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div class="sidebar-bottom">
+                <div class="sidebar-user-row">
+                    <div class="user-badge" id="userBadge">
+                        <div class="avatar" id="userAvatar"></div>
+                        <div class="user-info">
+                            <span id="userName" class="name">Guest</span>
+                            <span id="rolePill" class="role" style="display:none;">viewer</span>
+                        </div>
+                    </div>
+                    <button class="icon-btn" id="themeToggle" title="Сменить тему">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    </button>
                 </div>
-                <p>Перетащите ZIP-архив сюда или нажмите для выбора</p>
-                <p class="filename" id="fileName" style="display:none;"></p>
-                <input type="file" id="fileInput" accept=".zip" hidden>
+                <button class="btn btn-secondary btn-full" id="logoutBtn" style="display:none;">Выйти</button>
             </div>
-            <div class="form-row">
-                <div class="form-field">
-                    <label for="projectName">Проект</label>
-                    <input type="text" id="projectName" value="default" placeholder="default">
-                </div>
-            </div>
-            <div class="upload-actions">
-                <button class="btn btn-primary" id="uploadBtn" disabled>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    Добавить результаты
-                </button>
-            </div>
-            <div class="progress-wrap" id="progressBar">
-                <div class="progress-bar"><div class="fill"></div></div>
-                <div class="progress-text" id="progressText"><span class="spinner"></span>Генерация отчёта...</div>
-            </div>
-            <div class="alert" id="alert"></div>
-        </div>
+        </aside>
 
-        <!-- Reports list -->
-        <div class="card reports-card">
-            <div class="card-head">
-                <h2><span class="dot"></span> Проекты</h2>
-                <span class="meta" id="reportsMeta"></span>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Проект</th>
-                        <th>Загрузок</th>
-                        <th>Результатов</th>
-                        <th>Создан</th>
-                        <th>Обновлён</th>
-                        <th>Размер</th>
-                        <th>Действия</th>
-                    </tr>
-                </thead>
-                <tbody id="reportsBody">
-                    <tr><td colspan="7"><div class="empty-state"><div class="t">Загрузка...</div></div></td></tr>
-                </tbody>
-            </table>
-            <div class="pagination" id="pagination" style="display:none;">
-                <button id="prevBtn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="15 18 9 12 15 6"/></svg>
-                    Назад
-                </button>
-                <span class="info" id="pageInfo"></span>
-                <button id="nextBtn">
-                    Вперёд
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="dashboard-wrap">
+                <header class="top-bar">
+                    <h2>Dashboard Overview</h2>
+                </header>
+
+                <div class="dashboard-grid">
+                <!-- Upload Panel -->
+                <div class="glass-panel upload-panel" id="uploadCard">
+                    <div class="panel-header">
+                        <h3>REPORT MANAGEMENT</h3>
+                    </div>
+                    <div class="upload-content">
+                        <div class="drop-zone glass-panel-inner" id="dropZone">
+                            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <div class="upload-text">
+                                <strong>Upload Data File</strong>
+                                <span>Drag & drop ZIP с allure-results</span>
+                            </div>
+                            <button class="btn btn-accent btn-sm" onclick="document.getElementById('fileInput').click()">Browse</button>
+                            <input type="file" id="fileInput" accept=".zip" hidden>
+                        </div>
+                        <p class="filename" id="fileName" style="display:none;"></p>
+                        
+                        <div class="form-row">
+                            <input type="text" id="projectName" class="neon-input" value="default" placeholder="Project Name">
+                        </div>
+                        <button class="btn btn-primary btn-full neon-btn" id="uploadBtn" disabled>Generate New Report</button>
+                        
+                        <div class="progress-wrap" id="progressBar" style="display:none;">
+                            <div class="progress-bar"><div class="fill"></div></div>
+                            <div class="progress-text" id="progressText">Processing...</div>
+                        </div>
+                        <div class="alert" id="alert" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <!-- Projects Table Panel -->
+                <div class="glass-panel table-panel">
+                    <div class="panel-header">
+                        <h3>Recent Reports</h3>
+                        <span class="meta" id="reportsMeta"></span>
+                    </div>
+                    
+                    <div class="custom-table">
+                        <div class="table-header">
+                            <div class="col col-name">Report Name</div>
+                            <div class="col col-status">Status</div>
+                            <div class="col col-date">Updated</div>
+                            <div class="col col-actions">Actions</div>
+                        </div>
+                        <div class="table-body" id="reportsBody">
+                            <div class="empty-state">Loading...</div>
+                        </div>
+                    </div>
+
+                    <div class="pagination" id="pagination" style="display:none;">
+                        <button id="prevBtn" class="icon-btn" title="Назад"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+                        <span id="pageInfo"></span>
+                        <button id="nextBtn" class="icon-btn" title="Вперед"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>
+                    </div>
+                </div>
             </div>
         </div>
+        </main>
     </div>
-
     <script src="/static/app.js"></script>
 </body>
 </html>
