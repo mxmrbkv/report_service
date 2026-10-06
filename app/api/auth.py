@@ -211,7 +211,7 @@ async def _post_keycloak_token(data: dict, settings: Settings) -> dict:
                 )
                 token_resp = resp
                 break
-        except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+        except (httpx.RequestError, httpx.HTTPError) as exc:
             logger.warning("keycloak_token_connect_failed", url=url, error=str(exc))
             last_error = exc
             continue
