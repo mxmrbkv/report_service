@@ -64,11 +64,13 @@ def create_app() -> FastAPI:
             "- Автоматическая генерация HTML-отчётов через Allure CLI\n"
             "- Накопление результатов: повторные загрузки добавляются к проекту\n"
             "- Просмотр отчётов напрямую из сервиса\n"
-            "- Авторизация через Keycloak (OIDC)\n\n"
-            "### Авторизация\n"
-            "Если `AUTH_ENABLED=true` — все API-методы требуют авторизацию.\n"
-            "Войдите через веб-интерфейс (`/`) или кнопку «Войти через Keycloak»,\n"
-            "после чего сессионная cookie будет автоматически передаваться в запросах из Swagger UI.\n\n"
+            "- Авторизация через Keycloak (OIDC / Direct Access Grants)\n\n"
+            "### Авторизация и тестирование API (Swagger UI & Postman)\n"
+            "Если `AUTH_ENABLED=true` — методы API требуют авторизацию:\n"
+            "1. **Получение токена:** Выполните запрос `POST /auth/token` или `POST /auth/login`, передав логин и пароль.\n"
+            "2. **Тестирование в Postman:** Скопируйте полученный `access_token` и укажите его на вкладке **Authorization** -> тип **Bearer Token** (или передавайте заголовок `Authorization: Bearer <access_token>`).\n"
+            "3. **Тестирование в Swagger UI:** Нажмите зеленую кнопку **Authorize** в правом верхнем углу и вставьте полученный токен.\n"
+            "4. **Веб-интерфейс:** Вход через браузер доступен по адресу [/](/), сессия сохраняется в cookie.\n\n"
             "### Ссылки\n"
             "- Веб-интерфейс: [/](/)\n"
             "- ReDoc: [/redoc](/redoc)\n"
@@ -77,12 +79,12 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
         openapi_tags=[
             {
-                "name": "reports",
-                "description": "Управление Allure-отчётами: загрузка, просмотр, удаление.",
+                "name": "auth",
+                "description": "Авторизация через Keycloak: получение токена для Postman/Swagger (POST /auth/token), обновление (POST /auth/refresh) и профиль (GET /auth/me).",
             },
             {
-                "name": "auth",
-                "description": "Авторизация через Keycloak: логин, callback, logout, профиль пользователя.",
+                "name": "reports",
+                "description": "Управление Allure-отчётами: загрузка архивов, просмотр проектов, удаление.",
             },
         ],
         swagger_ui_parameters={

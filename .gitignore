@@ -16,9 +16,10 @@ venv/
 .env
 .env.prod
 
-# Data (отчёты не коммитим)
+# Data (отчёты и базы данных не коммитим)
 data/reports/*
 !data/reports/.gitkeep
+data/*.db
 
 # OS
 .DS_Store
